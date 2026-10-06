@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fantômes — Dépose ton relevé</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,900&family=Figtree:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F6F1E7;--ink:#1B1A17;--mute:#5E5A50;--accent:#D9381E;--card:#FFFFFF;--line:#DDD5C3}
+@media (prefers-color-scheme:dark){:root{--bg:#14130F;--ink:#F3EDE0;--mute:#B0A999;--accent:#FF6A4D;--card:#1E1C17;--line:#35322A}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.5 Figtree,system-ui,sans-serif}
+.w{max-width:560px;margin:0 auto;padding:0 20px 50px}
+.logo{display:block;padding:18px 0;font-family:Fraunces,serif;font-weight:900;font-size:1.25rem;color:var(--ink);text-decoration:none}
+h1{font-family:Fraunces,Georgia,serif;font-weight:900;font-size:1.9rem;line-height:1.1;margin:10px 0 14px}
+.mute{color:var(--mute);font-size:.92rem}
+.btn{display:block;width:100%;text-align:center;background:var(--accent);color:#fff;border:0;font:700 1.1rem Figtree,sans-serif;padding:18px;border-radius:14px;cursor:pointer;min-height:56px}
+.btn.alt{background:none;color:var(--ink);border:2px solid var(--line);margin-top:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin:12px 0}
+.row{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.name{font-weight:700;font-size:1.1rem}
+.amt{font-family:Fraunces,serif;font-weight:900;font-size:1.5rem;color:var(--accent);white-space:nowrap}
+.tot{font-family:Fraunces,serif;font-weight:900;font-size:3.2rem;color:var(--accent);line-height:1}
+.lock{color:var(--mute);font-weight:600;margin-top:10px;font-size:.95rem}
+textarea{width:100%;height:280px;margin-top:12px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--bg);color:var(--ink);font:400 .95rem/1.45 Figtree,sans-serif}
+input[type=file]{display:none}
+</style>
+</head>
+<body>
+<div class="w">
+<a class="logo" href="/">Fantômes</a>
+<div id="app"></div>
+</div>
+<script>
+var app=document.getElementById("app");
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function eur(x){return x.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" €"}
+function home(msg){
+app.innerHTML='<h1>Dépose ton relevé bancaire</h1><p>Un fichier CSV exporté depuis ton espace bancaire. Il reste sur ton téléphone : il n\'est envoyé nulle part.</p>'
++(msg?'<div class="card">'+msg+'</div>':'')
++'<label class="btn" for="f">Choisir mon fichier CSV</label><input id="f" type="file" accept=".csv,.txt,text/csv">'
++'<button class="btn alt" id="demo">Essayer avec un exemple</button>'
++'<p class="mute">Conseil : exporte au moins 3 mois, pour que les prélèvements réguliers apparaissent.</p>';
+document.getElementById("f").onchange=function(e){var f=e.target.files[0];if(f)readFile(f,analyse)};
+document.getElementById("demo").onclick=function(){analyse(sample())};
+}
+function readFile(f,cb){var r=new FileReader();r.onload=function(){var t=r.result;
+if(t.indexOf("\uFFFD")>-1){var r2=new FileReader();r2.onload=function(){cb(r2.result)};r2.readAsText(f,"windows-1252")}else cb(t)};r.readAsText(f)}
+function sample(){var l=["Date;Libellé;Montant"];
+["01","02","03"].forEach(function(m){
+l.push("05/"+m+"/2026;PRLV SEPA NETFLIX.COM;-13,49");
+l.push("12/"+m+"/2026;PRLV SEPA SPOTIFY AB;-10,99");
+l.push("03/"+m+"/2026;PRLV BASIC FIT 4521;-29,90");
+l.push("20/"+m+"/2026;PRLV SEPA CLOUDSTOCK PLUS;-2,99");
+l.push("08/"+m+"/2026;CB CARREFOUR "+(m*7)+";-"+(30+m*3)+",20");
+l.push("25/"+m+"/2026;VIR SALAIRE;1200,00")});
+return l.join("\n")}
+function parseLine(s,d){var o=[],c="",q=false;for(var i=0;i<s.length;i++){var ch=s[i];
+if(ch=='"'){q=!q}else if(ch==d&&!q){o.push(c.trim());c=""}else c+=ch}o.push(c.trim());return o}
+function num(s){if(s==null)return NaN;s=String(s).replace(/[€\s\u00a0+]/g,"");if(!/^-?[\d.,]+$/.test(s))return NaN;
+if(s.indexOf(",")>-1)s=s.replace(/\./g,"").replace(",",".");return parseFloat(s)}
+function pdate(s){var m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);if(m)return new Date(+m[3],m[2]-1,+m[1]);
+m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);return m?new Date(+m[1],m[2]-1,+m[3]):null}
+function norm(s){s=s.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+s=s.replace(/\d+/g," ").replace(/\b(PRLV|SEPA|PRELEVEMENT|PRELEVEMENTS|CB|PAIEMENT|CARTE|FACTURE|REF|DE|DU|COM|WWW|FR)\b/g," ").replace(/[^A-Z ]/g," ").replace(/\s+/g," ").trim();
+return s.split(" ").slice(0,2).join(" ")}
+function pretty(k){return k.toLowerCase().replace(/(^| )\w/g,function(c){return c.toUpperCase()})}
+function med(a){var b=a.slice().sort(function(x,y){return x-y}),h=b.length>>1;return b.length%2?b[h]:(b[h-1]+b[h])/2}
+function analyse(txt){
+var lines=txt.split(/\r?\n/).filter(function(x){return x.trim()});
+if(lines.length<2)return home("Ce fichier est vide ou illisible.");
+var d=(lines[0].split(";").length>lines[0].split(",").length)?";":",";
+var rows=lines.map(function(l){return parseLine(l,d)});
+var iA=-1,iD=-1,iC=-1,iL=-1,h=rows[0].map(function(x){return x.toLowerCase()});
+h.forEach(function(x,i){if(/montant|amount/.test(x))iA=i;else if(/d[ée]bit/.test(x))iD=i;else if(/cr[ée]dit/.test(x))iC=i;if(/libell|label|description|d[ée]tail|op[ée]ration/.test(x)&&iL<0)iL=i});
+var ops=[];
+rows.forEach(function(r){var dt=null,lab="",amt=NaN,i;
+for(i=0;i<r.length;i++){var x=pdate(r[i]);if(x){dt=x;break}}
+if(!dt)return;
+if(iL>=0&&r[iL])lab=r[iL];else r.forEach(function(x){if(!pdate(x)&&isNaN(num(x))&&x.length>lab.length)lab=x});
+if(iA>=0)amt=num(r[iA]);
+else if(iD>=0){var dv=num(r[iD]);if(!isNaN(dv)&&dv!==0)amt=-Math.abs(dv);else{var cv=num(r[iC]);if(!isNaN(cv))amt=Math.abs(cv)}}
+else{for(i=0;i<r.length;i++){if(!pdate(r[i])&&!isNaN(num(r[i]))){amt=num(r[i]);break}}}
+if(isNaN(amt)||amt>=0||!lab)return;
+ops.push({d:dt,k:norm(lab),a:-amt})});
+if(!ops.length)return home("Je n'ai trouvé aucune dépense dans ce fichier. Vérifie que c'est bien un export CSV de ton relevé.");
+var g={};ops.forEach(function(o){if(o.k.length<3)return;(g[o.k]=g[o.k]||[]).push(o)});
+var out=[];
+Object.keys(g).forEach(function(k){var a=g[k];if(a.length<2)return;
+var m=med(a.map(function(o){return o.a}));
+a=a.filter(function(o){return Math.abs(o.a-m)<=m*0.15});if(a.length<2)return;
+a.sort(function(x,y){return x.d-y.d});var gaps=[];
+for(var i=1;i<a.length;i++)gaps.push((a[i].d-a[i-1].d)/864e5);
+var gm=med(gaps);if(gm<24||gm>38)return;
+out.push({n:pretty(k),m:m,y:m*12,c:a.length})});
+out.sort(function(x,y){return y.y-x.y});
+if(!out.length)return home("Aucun prélèvement régulier détecté. Essaie avec un relevé plus long (3 mois ou plus).");
+show(out)}
+function show(L){
+var tot=L.reduce(function(s,x){return s+x.y},0);
+var h='<p class="mute">Ton audit</p><div class="tot">'+Math.round(tot).toLocaleString("fr-FR")+' €</div><p>par an, répartis sur <b>'+L.length+' prélèvements réguliers</b>, du plus coûteux au moins coûteux.</p>';
+L.forEach(function(x,i){
+h+='<div class="card"><div class="row"><span class="name">'+esc(x.n)+'</span><span class="amt">'+Math.round(x.y).toLocaleString("fr-FR")+' €/an</span></div>'
++'<div class="mute">'+eur(x.m)+' par mois · vu '+x.c+' fois</div>'
++(i===0?'<button class="btn" style="margin-top:12px" data-i="0">Voir ma lettre de résiliation (gratuit)</button>':'<div class="lock">Lettre de résiliation verrouillée</div>')+'</div>'});
+h+='<p class="mute">Seuls les prélèvements réguliers sont listés. À toi de dire lesquels tu n\'utilises plus.</p><button class="btn alt" id="again">Analyser un autre relevé</button>';
+app.innerHTML=h;
+app.querySelector("[data-i]").onclick=function(){letter(L[0],L)};
+document.getElementById("again").onclick=function(){home()};
+window.scrollTo(0,0)}
+function letter(x,L){
+var t="[Prénom Nom]\n[Adresse]\n[Code postal Ville]\n\n"+x.n+"\n[Service résiliation / adresse du service]\n\nFait à [Ville], le [Date]\n\nObjet : résiliation de mon abonnement\nNuméro de contrat ou client : [à compléter]\n\nMadame, Monsieur,\n\nPar la présente, je vous demande de résilier mon abonnement "+x.n+", avec effet à la prochaine échéance possible, et de ne plus procéder à aucun prélèvement sur mon compte au-delà de cette date.\n\nJe vous remercie de bien vouloir me confirmer la résiliation par écrit, ainsi que sa date d'effet.\n\nVeuillez agréer, Madame, Monsieur, l'expression de mes salutations distinguées.\n\n[Signature]";
+app.innerHTML='<h1>Ta lettre pour '+esc(x.n)+'</h1><p>Remplace les champs entre [crochets], puis envoie-la par courrier recommandé ou par le formulaire de résiliation du service.</p>'
++'<p class="mute">Résilier te fait économiser '+Math.round(x.y).toLocaleString("fr-FR")+' € par an.</p><textarea id="t">'+esc(t)+'</textarea>'
++'<button class="btn" id="cp" style="margin-top:12px">Copier la lettre</button><button class="btn alt" id="bk">← Retour à ma liste</button>';
+document.getElementById("cp").onclick=function(){var e=document.getElementById("t");e.select();
+try{navigator.clipboard.writeText(e.value)}catch(_){document.execCommand("copy")}this.textContent="Copiée"};
+document.getElementById("bk").onclick=function(){show(L)};window.scrollTo(0,0)}
+home();
+</script>
+</body>
+</html>
