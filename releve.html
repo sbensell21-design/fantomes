@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Fantômes — Dépose ton relevé</title>
+<title>Fantômes — Ton audit</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,900&family=Figtree:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#F6F1E7;--ink:#1B1A17;--mute:#5E5A50;--accent:#D9381E;--card:#FFFFFF;--line:#DDD5C3}
@@ -14,7 +14,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.5 Figtree,sy
 .logo{display:block;padding:18px 0;font-family:Fraunces,serif;font-weight:900;font-size:1.25rem;color:var(--ink);text-decoration:none}
 h1{font-family:Fraunces,Georgia,serif;font-weight:900;font-size:1.9rem;line-height:1.1;margin:10px 0 14px}
 .mute{color:var(--mute);font-size:.92rem}
-.btn{display:block;width:100%;text-align:center;background:var(--accent);color:#fff;border:0;font:700 1.1rem Figtree,sans-serif;padding:18px;border-radius:14px;cursor:pointer;min-height:56px}
+.btn{display:block;width:100%;text-align:center;background:var(--accent);color:#fff;border:0;text-decoration:none;font:700 1.1rem Figtree,sans-serif;padding:18px;border-radius:14px;cursor:pointer;min-height:56px}
 .btn.alt{background:none;color:var(--ink);border:2px solid var(--line);margin-top:12px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin:12px 0}
 .row{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
@@ -22,6 +22,7 @@ h1{font-family:Fraunces,Georgia,serif;font-weight:900;font-size:1.9rem;line-heig
 .amt{font-family:Fraunces,serif;font-weight:900;font-size:1.5rem;color:var(--accent);white-space:nowrap}
 .tot{font-family:Fraunces,serif;font-weight:900;font-size:3.2rem;color:var(--accent);line-height:1}
 .lock{color:var(--mute);font-weight:600;margin-top:10px;font-size:.95rem}
+.ok{color:var(--mute);font-weight:600;margin:6px 0}
 textarea{width:100%;height:280px;margin-top:12px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--bg);color:var(--ink);font:400 .95rem/1.45 Figtree,sans-serif}
 input[type=file]{display:none}
 </style>
@@ -31,10 +32,19 @@ input[type=file]{display:none}
 <a class="logo" href="/">Fantômes</a>
 <div id="app"></div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.js"></script>
 <script>
-var app=document.getElementById("app");
+var sb=supabase.createClient("https://ygbjyinzbfnuragiqbux.supabase.co","sb_publishable_p3eQON1vnDydMQFsYFliEQ_HZ5Q84x8");
+var app=document.getElementById("app"),KEY="fantomes_audit";
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function eur(x){return x.toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" €"}
+function save(L){try{localStorage.setItem(KEY,JSON.stringify(L))}catch(e){}}
+function load(){try{var x=JSON.parse(localStorage.getItem(KEY)||"null");return Array.isArray(x)&&x.length?x:null}catch(e){return null}}
+function isPaid(){
+ return sb.auth.getSession().then(function(r){
+  var s=r.data.session;if(!s)return false;
+  return sb.from("abonnements").select("statut").eq("user_id",s.user.id).maybeSingle().then(function(x){return !!(x.data&&x.data.statut==="actif")})
+ }).catch(function(){return false})}
 function home(msg){
 app.innerHTML='<h1>Dépose ton relevé bancaire</h1><p>Un fichier CSV exporté depuis ton espace bancaire. Il reste sur ton téléphone : il n\'est envoyé nulle part.</p>'
 +(msg?'<div class="card">'+msg+'</div>':'')
@@ -97,26 +107,33 @@ out.sort(function(x,y){return y.y-x.y});
 if(!out.length)return home("Aucun prélèvement régulier détecté. Essaie avec un relevé plus long (3 mois ou plus).");
 show(out)}
 function show(L){
+save(L);
+isPaid().then(function(paid){render(L,paid)})}
+function render(L,paid){
 var tot=L.reduce(function(s,x){return s+x.y},0);
 var h='<p class="mute">Ton audit</p><div class="tot">'+Math.round(tot).toLocaleString("fr-FR")+' €</div><p>par an, répartis sur <b>'+L.length+' prélèvements réguliers</b>, du plus coûteux au moins coûteux.</p>';
+if(paid)h+='<p class="ok">Accès complet actif : toutes tes lettres sont débloquées.</p>';
 L.forEach(function(x,i){
 h+='<div class="card"><div class="row"><span class="name">'+esc(x.n)+'</span><span class="amt">'+Math.round(x.y).toLocaleString("fr-FR")+' €/an</span></div>'
 +'<div class="mute">'+eur(x.m)+' par mois · vu '+x.c+' fois</div>'
-+(i===0?'<button class="btn" style="margin-top:12px" data-i="0">Voir ma lettre de résiliation (gratuit)</button>':'<div class="lock">Lettre de résiliation verrouillée</div>')+'</div>'});
++((i===0||paid)?'<button class="btn" style="margin-top:12px" data-i="'+i+'">Voir ma lettre de résiliation'+(i===0&&!paid?' (gratuit)':'')+'</button>':'<div class="lock">Lettre de résiliation verrouillée</div>')+'</div>'});
+if(!paid){
+h+='<a class="btn" href="paiement.html">Débloquer toutes mes lettres</a><p class="mute" style="text-align:center">Dès 6,90 € par mois · sans engagement · satisfait ou remboursé 14 jours.</p>'}
 h+='<p class="mute">Seuls les prélèvements réguliers sont listés. À toi de dire lesquels tu n\'utilises plus.</p><button class="btn alt" id="again">Analyser un autre relevé</button>';
 app.innerHTML=h;
-app.querySelector("[data-i]").onclick=function(){letter(L[0],L)};
+app.querySelectorAll("[data-i]").forEach(function(b){b.onclick=function(){letter(L[+b.dataset.i],L,paid)}});
 document.getElementById("again").onclick=function(){home()};
 window.scrollTo(0,0)}
-function letter(x,L){
+function letter(x,L,paid){
 var t="[Prénom Nom]\n[Adresse]\n[Code postal Ville]\n\n"+x.n+"\n[Service résiliation / adresse du service]\n\nFait à [Ville], le [Date]\n\nObjet : résiliation de mon abonnement\nNuméro de contrat ou client : [à compléter]\n\nMadame, Monsieur,\n\nPar la présente, je vous demande de résilier mon abonnement "+x.n+", avec effet à la prochaine échéance possible, et de ne plus procéder à aucun prélèvement sur mon compte au-delà de cette date.\n\nJe vous remercie de bien vouloir me confirmer la résiliation par écrit, ainsi que sa date d'effet.\n\nVeuillez agréer, Madame, Monsieur, l'expression de mes salutations distinguées.\n\n[Signature]";
 app.innerHTML='<h1>Ta lettre pour '+esc(x.n)+'</h1><p>Remplace les champs entre [crochets], puis envoie-la par courrier recommandé ou par le formulaire de résiliation du service.</p>'
 +'<p class="mute">Résilier te fait économiser '+Math.round(x.y).toLocaleString("fr-FR")+' € par an.</p><textarea id="t">'+esc(t)+'</textarea>'
 +'<button class="btn" id="cp" style="margin-top:12px">Copier la lettre</button><button class="btn alt" id="bk">← Retour à ma liste</button>';
 document.getElementById("cp").onclick=function(){var e=document.getElementById("t");e.select();
 try{navigator.clipboard.writeText(e.value)}catch(_){document.execCommand("copy")}this.textContent="Copiée"};
-document.getElementById("bk").onclick=function(){show(L)};window.scrollTo(0,0)}
-home();
+document.getElementById("bk").onclick=function(){render(L,paid)};window.scrollTo(0,0)}
+var saved=load();
+if(saved)show(saved);else home();
 </script>
 </body>
 </html>
