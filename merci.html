@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fantômes — Merci</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,900&family=Figtree:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F6F1E7;--ink:#1B1A17;--mute:#5E5A50;--accent:#D9381E}
+@media (prefers-color-scheme:dark){:root{--bg:#14130F;--ink:#F3EDE0;--mute:#B0A999;--accent:#FF6A4D}}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.5 Figtree,system-ui,sans-serif}
+.w{max-width:560px;margin:0 auto;padding:40px 20px}
+h1{font-family:Fraunces,serif;font-weight:900;font-size:2rem;line-height:1.1}
+.btn{display:block;text-align:center;background:var(--accent);color:#fff;text-decoration:none;font-weight:700;padding:17px;border-radius:14px;margin-top:20px}
+.mute{color:var(--mute)}
+</style>
+</head>
+<body>
+<div class="w">
+<h1 id="t">Vérification de ton paiement…</h1>
+<p class="mute" id="m">Ça prend quelques secondes.</p>
+<a class="btn" id="b" href="releve.html" style="display:none">Voir mes lettres</a>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.js"></script>
+<script>
+var sb=supabase.createClient("https://ygbjyinzbfnuragiqbux.supabase.co","sb_publishable_p3eQON1vnDydMQFsYFliEQ_HZ5Q84x8");
+var n=0;
+function ok(){document.getElementById("t").textContent="Paiement confirmé. Merci !";document.getElementById("m").textContent="Ton accès est actif.";document.getElementById("b").style.display="block"}
+function ko(){document.getElementById("t").textContent="Confirmation en cours";document.getElementById("m").textContent="Ton paiement est bien parti, mais la confirmation tarde. Recharge cette page dans une minute. Si rien ne change, écris-nous avec ton email."}
+function check(){
+ sb.auth.getSession().then(function(r){
+  if(!r.data.session){location.href="paiement.html";return}
+  return sb.from("abonnements").select("statut").eq("user_id",r.data.session.user.id).maybeSingle().then(function(x){
+   if(x.data&&x.data.statut==="actif")ok();else if(++n<10)setTimeout(check,2000);else ko()
+  })})}
+check();
+</script>
+</body>
+</html>
